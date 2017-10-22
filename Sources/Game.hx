@@ -33,6 +33,8 @@ typedef GraphicsData = {
 typedef People = {
 	> Entity,
 	var action:Int;
+	var insideCopter:Bool;
+	var number:Int;
 }
 
 class Game {
@@ -46,6 +48,8 @@ class Game {
 	var copterLookLeft = true;
 	var copterRotationSpeed = Math.PI/50;
 	var copterMaxRotation = Math.PI/6;
+	var copterNbPeople = 0;
+	var copterSpeed = 0.02;
 
 	var mountains:Entity;
 	var copter:Entity;
@@ -107,28 +111,36 @@ class Game {
 	}
 
 	function update(): Void {
-		if (moveLeft) {
-			mountains.x += 0.01;
-			for (b in buildings) {
-				b.x += 0.01;
+		if (copter.y > -0.85) {
+			if (moveLeft) {
+				mountains.x += copterSpeed;
+				for (b in buildings) {
+					b.x += copterSpeed;
+				}
+				for (p in people) {
+					p.x += copterSpeed;
+				}
 			}
-			for (p in people) {
-				p.x += 0.01;
+			else if (moveRight) {
+				mountains.x -= copterSpeed;
+				for (b in buildings) {
+					b.x -= copterSpeed;
+				}
+				for (p in people) {
+					p.x -= copterSpeed;
+				}
 			}
-		}
-		else if (moveRight) {
-			mountains.x -= 0.01;
-			for (b in buildings) {
-				b.x -= 0.01;
+			if (moveLeft || moveRight) {
+				copter.rotation += copterRotationSpeed;
+				if (copter.rotation > copterMaxRotation) {
+					copter.rotation = copterMaxRotation;
+				}
 			}
-			for (p in people) {
-				p.x -= 0.01;
-			}
-		}
-		if (moveLeft || moveRight) {
-			copter.rotation += copterRotationSpeed;
-			if (copter.rotation > copterMaxRotation) {
-				copter.rotation = copterMaxRotation;
+			else {
+				copter.rotation -= copterRotationSpeed;
+				if (copter.rotation < 0) {
+					copter.rotation = 0;
+				}
 			}
 		}
 		else {
@@ -137,38 +149,51 @@ class Game {
 				copter.rotation = 0;
 			}
 		}
-		if (moveUp) {
+		if (moveUp && copter.y < 0.0) {
 			copter.y += 0.01;
 		}
-		else if (moveDown) {
+		else if (moveDown && copter.y > -0.95) {
 			copter.y -= 0.01;
 		}
 		copter.scale = copterLookLeft ? 1.0 : -1.0;
 		for (p in people) {
-			var distance = Math.abs(copter.x - p.x);
-			if (distance < 0.75) {
-				if (copter.y < -0.9) {
-					p.action = 2;
-				}
-				else {
-					p.action = 1;
-				}
+			if (p.insideCopter) {
+				p.x = copter.x - 0.025*p.number;
+				p.y = copter.y;
+				p.rotation = copter.rotation;
+				p.scale = copter.scale;
 			}
 			else {
-				p.action = 0;
-			}
-			if (p.action == 0) {
-				p.y = -0.95;
-			}
-			else if (p.action == 1) {
-				p.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
-			}
-			else if (p.action == 2) {
-				if (p.y > -0.95) {
-					p.y -= 0.01;
+				var distance = Math.abs(copter.x - p.x);
+				if (distance < 0.75) {
+					if (copter.y < -0.9) {
+						p.action = 2;
+					}
+					else {
+						p.action = 1;
+					}
 				}
-				else if (distance > 0.1) {
-					p.x += (copter.x < p.x) ? -0.01 : 0.01;
+				else {
+					p.action = 0;
+				}
+				if (p.action == 0) {
+					p.y = -0.95;
+				}
+				else if (p.action == 1) {
+					p.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
+				}
+				else if (p.action == 2) {
+					if (p.y > -0.95) {
+						p.y -= 0.01;
+					}
+					else if (distance > 0.01) {
+						p.x += (copter.x < p.x) ? -0.01 : 0.01;
+					}
+					else {
+						p.insideCopter = true;
+						p.number = copterNbPeople;
+						copterNbPeople++;
+					}
 				}
 			}
 		}
@@ -259,7 +284,9 @@ class Game {
 				scale: e.scale,
 				x: px,
 				y: -0.95,
-				action: 0
+				action: 0,
+				insideCopter: false,
+				number: -1
 			});
 			px += screenWidth;
 		}
