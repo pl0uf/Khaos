@@ -48,15 +48,15 @@ class EntityMaker
 		return e;		
 	}
 
-	public static function makeMountain(graphicsData:GraphicsData):Entity
+	public static function makeMountain(graphicsData:GraphicsData, nbMountains:Int, width:Float):Entity
 	{
 		var e:Entity = { indiceStart: graphicsData.indices.length, indiceCount: 0, vertexStart: graphicsData.vertices.length, vertexCount: 0, rotation: 0.0, scale: 1.0, x: 0.0, y: 0.0};
 
-		var mountain = createMountainHeights(5);
-		for (i in 0...50) {
-			mountain = mountain.concat(createMountainHeights(5));
-		}
-		var step = 0.03;
+		var mountain = [];
+    for (i in 0...nbMountains) {
+      mountain = mountain.concat(createMountainHeights(5));
+    }
+		var step = width/(mountain.length - 1);
 
 		var ind = createIndices(Std.int(graphicsData.vertices.length/2), mountain.length);
 		e.indiceCount = ind.length;
@@ -165,7 +165,6 @@ class EntityMaker
 	{
 		var vert:Array<Float> = [];
 		var x = 0.0;
-		var z = 0.0;
 		for (i in 0...heights.length) {
 			vert.push(x);
 			vert.push(heights[i]);

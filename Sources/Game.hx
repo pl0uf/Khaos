@@ -30,6 +30,11 @@ typedef GraphicsData = {
 	@:optional var mvpID:ConstantLocation;
 }
 
+typedef People = {
+	> Entity,
+	var action:Int;
+}
+
 class Game {
 	var graphicsData:GraphicsData;
 
@@ -45,7 +50,7 @@ class Game {
 	var mountains:Entity;
 	var copter:Entity;
 	var buildings:Array<Entity>;
-	var people:Array<Entity>;
+	var people:Array<People>;
 	var entities:Array<Entity>;
 
 	public function new() {
@@ -71,30 +76,7 @@ class Game {
 		graphicsData.vertices = new Array<Float>();
 		graphicsData.indices = new Array<Int>();
 
-		mountains = EntityMaker.makeMountain(graphicsData);
-		mountains.x = -5;
-		copter = EntityMaker.makeCopter(graphicsData);
-		buildings = new Array<Entity>();
-		var px = 0.0;
-		for (i in 0...50) {
-			var b = EntityMaker.makeBuilding(graphicsData);
-			b.x = px + Math.random() * 1.0 - 0.5;
-			b.y = -0.9;
-			buildings.push(b);
-			px += 1.0;
-		}
-		people = new Array<Entity>();
-		px = 0.0;
-		for (i in 0...100) {
-			var p = EntityMaker.makePeople(graphicsData);
-			p.x = px + Math.random() * 1.0 - 0.5;
-			p.y = -0.95;
-			people.push(p);
-			px += 0.11;
-		}
-		entities = [ mountains, copter ];
-		entities = entities.concat(buildings);
-		entities = entities.concat(people);
+		createLevel();
 
 		graphicsData.vertexBuffer = new VertexBuffer(
 			Std.int(graphicsData.vertices.length / 2),
@@ -162,6 +144,34 @@ class Game {
 			copter.y -= 0.01;
 		}
 		copter.scale = copterLookLeft ? 1.0 : -1.0;
+		for (p in people) {
+			var distance = Math.abs(copter.x - p.x);
+			if (distance < 0.75) {
+				if (copter.y < -0.9) {
+					p.action = 2;
+				}
+				else {
+					p.action = 1;
+				}
+			}
+			else {
+				p.action = 0;
+			}
+			if (p.action == 0) {
+				p.y = -0.95;
+			}
+			else if (p.action == 1) {
+				p.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
+			}
+			else if (p.action == 2) {
+				if (p.y > -0.95) {
+					p.y -= 0.01;
+				}
+				else if (distance > 0.1) {
+					p.x += (copter.x < p.x) ? -0.01 : 0.01;
+				}
+			}
+		}
 
 		for (e in entities) {
 			updateEntityVertexBuffer(e);
@@ -222,4 +232,39 @@ class Game {
         else if (key == KeyCode.Right) moveRight = false;
 	}
 
+	function createLevel() {
+		var screenWidth = 2*16/9;
+		mountains = EntityMaker.makeMountain(graphicsData, 5, screenWidth*5);
+		mountains.x = -screenWidth/2;
+		copter = EntityMaker.makeCopter(graphicsData);
+		buildings = new Array<Entity>();
+		var px = screenWidth/3;
+		for (i in 0...5) {
+			var b = EntityMaker.makeBuilding(graphicsData);
+			b.x = px;// + Math.random() * 1.0 - 0.5;
+			b.y = -0.9;
+			buildings.push(b);
+			px += screenWidth;
+		}
+		people = new Array<People>();
+		px = screenWidth/3;
+		for (i in 0...buildings.length) {
+			var e = EntityMaker.makePeople(graphicsData);
+			people.push({ 
+				indiceStart: e.indiceStart,
+				indiceCount: e.indiceCount,
+				vertexStart: e.vertexStart,
+				vertexCount: e.vertexCount,
+				rotation: e.rotation,
+				scale: e.scale,
+				x: px,
+				y: -0.95,
+				action: 0
+			});
+			px += screenWidth;
+		}
+		entities = [ mountains, copter ];
+		entities = entities.concat(buildings);
+		entities = entities.concat(people);
+	}
 }
