@@ -30,10 +30,17 @@ typedef GraphicsData = {
 	@:optional var mvpID:ConstantLocation;
 }
 
+enum PeopleState {
+	Wait;
+	Jump;
+	GoToCopter;
+	InsideCopter;
+	GoToSavePoint;
+}
+
 typedef People = {
 	> Entity,
-	var action:Int;
-	var insideCopter:Bool;
+	var state:PeopleState;
 	var number:Int;
 }
 
@@ -157,7 +164,7 @@ class Game {
 		}
 		copter.scale = copterLookLeft ? 1.0 : -1.0;
 		for (p in people) {
-			if (p.insideCopter) {
+			if (p.state == InsideCopter) {
 				p.x = copter.x - 0.025*p.number;
 				p.y = copter.y;
 				p.rotation = copter.rotation;
@@ -167,22 +174,22 @@ class Game {
 				var distance = Math.abs(copter.x - p.x);
 				if (distance < 0.75) {
 					if (copter.y < -0.9) {
-						p.action = 2;
+						p.state = GoToCopter;
 					}
 					else {
-						p.action = 1;
+						p.state = Jump;
 					}
 				}
 				else {
-					p.action = 0;
+					p.state = Wait;
 				}
-				if (p.action == 0) {
+				if (p.state == Wait) {
 					p.y = -0.95;
 				}
-				else if (p.action == 1) {
+				else if (p.state == Jump) {
 					p.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
 				}
-				else if (p.action == 2) {
+				else if (p.state == GoToCopter) {
 					if (p.y > -0.95) {
 						p.y -= 0.01;
 					}
@@ -190,7 +197,7 @@ class Game {
 						p.x += (copter.x < p.x) ? -0.01 : 0.01;
 					}
 					else {
-						p.insideCopter = true;
+						p.state = InsideCopter;
 						p.number = copterNbPeople;
 						copterNbPeople++;
 					}
@@ -284,8 +291,7 @@ class Game {
 				scale: e.scale,
 				x: px,
 				y: -0.95,
-				action: 0,
-				insideCopter: false,
+				state: Wait,
 				number: -1
 			});
 			px += screenWidth;
