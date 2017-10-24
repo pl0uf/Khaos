@@ -36,6 +36,7 @@ enum PeopleState {
 	GoToCopter;
 	InsideCopter;
 	GoToSavePoint;
+	Saved;
 }
 
 typedef People = {
@@ -60,6 +61,7 @@ class Game {
 
 	var mountains:Entity;
 	var copter:Entity;
+	var savePoint:Entity;
 	var buildings:Array<Entity>;
 	var people:Array<People>;
 	var entities:Array<Entity>;
@@ -121,6 +123,7 @@ class Game {
 		if (copter.y > -0.85) {
 			if (moveLeft) {
 				mountains.x += copterSpeed;
+				savePoint.x += copterSpeed;
 				for (b in buildings) {
 					b.x += copterSpeed;
 				}
@@ -130,6 +133,7 @@ class Game {
 			}
 			else if (moveRight) {
 				mountains.x -= copterSpeed;
+				savePoint.x -= copterSpeed;
 				for (b in buildings) {
 					b.x -= copterSpeed;
 				}
@@ -169,8 +173,22 @@ class Game {
 				p.y = copter.y;
 				p.rotation = copter.rotation;
 				p.scale = copter.scale;
+				if (copter.y < -0.9) {
+					var distance = Math.abs(savePoint.x - p.x);
+					if (distance < 0.75) {
+						p.state = GoToSavePoint;
+						p.y = -0.95;
+					}
+				}
 			}
-			else {
+			else if (p.state == GoToSavePoint) {
+				var distance = Math.abs(savePoint.x - p.x);
+				p.x += (savePoint.x < p.x) ? -0.01 : 0.01;
+				if (distance < 0.01) {
+					p.state = Saved;
+				}
+			}
+			else if (p.state != Saved) {
 				var distance = Math.abs(copter.x - p.x);
 				if (distance < 0.75) {
 					if (copter.y < -0.9) {
@@ -269,6 +287,9 @@ class Game {
 		mountains = EntityMaker.makeMountain(graphicsData, 5, screenWidth*5);
 		mountains.x = -screenWidth/2;
 		copter = EntityMaker.makeCopter(graphicsData);
+		savePoint = EntityMaker.makeBuilding(graphicsData);
+		savePoint.x = -screenWidth/2;
+		savePoint.y = -0.9;
 		buildings = new Array<Entity>();
 		var px = screenWidth/3;
 		for (i in 0...5) {
@@ -296,7 +317,7 @@ class Game {
 			});
 			px += screenWidth;
 		}
-		entities = [ mountains, copter ];
+		entities = [ mountains, copter, savePoint ];
 		entities = entities.concat(buildings);
 		entities = entities.concat(people);
 	}
