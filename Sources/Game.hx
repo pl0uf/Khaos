@@ -1,5 +1,7 @@
 package;
 
+import kha.Assets;
+import kha.Font;
 import kha.Framebuffer;
 import kha.Scheduler;
 import kha.System;
@@ -59,6 +61,9 @@ class Game {
 	var copterNbPeople = 0;
 	var copterSpeed = 0.02;
 
+	var nbPeopleSaved = 0;
+	var finished = false;
+
 	var mountains:Entity;
 	var copter:Entity;
 	var savePoint:Entity;
@@ -66,7 +71,11 @@ class Game {
 	var people:Array<People>;
 	var entities:Array<Entity>;
 
+	var font:Font;
+
 	public function new() {
+		font = Assets.fonts.Inconsolata_Regular;
+
 		graphicsData = {};
 		var structure = new VertexStructure();
 		structure.add("pos", VertexData.Float2);
@@ -186,6 +195,8 @@ class Game {
 				p.x += (savePoint.x < p.x) ? -0.01 : 0.01;
 				if (distance < 0.01) {
 					p.state = Saved;
+					nbPeopleSaved++;
+					finished = (nbPeopleSaved == people.length);
 				}
 			}
 			else if (p.state != Saved) {
@@ -232,14 +243,24 @@ class Game {
 		var g = frame.g4;
     g.begin();
 		g.clear(Color.Black);
-
 		g.setVertexBuffer(graphicsData.vertexBuffer);
 		g.setIndexBuffer(graphicsData.indexBuffer);
 		g.setPipeline(graphicsData.pipeline);
 		g.setMatrix(graphicsData.mvpID, graphicsData.mvp);
 		g.drawIndexedVertices();
-
 		g.end();
+
+		var g2 = frame.g2;
+		g2.begin(false);
+		g2.font = font;
+		g2.fontSize = 24;
+		g2.color = Color.fromValue(0xFFFF0000);
+		g2.drawString('KHAOS: $nbPeopleSaved/${people.length}', 5, 0);
+		if (finished) {
+			g2.fontSize = 100;
+			g2.drawString('YOU WIN !!!', 600, 400);
+		}
+		g2.end();
 	}
 
 	function updateEntityVertexBuffer(e:Entity) {
@@ -294,7 +315,7 @@ class Game {
 		var px = screenWidth/3;
 		for (i in 0...5) {
 			var b = EntityMaker.makeBuilding(graphicsData);
-			b.x = px;// + Math.random() * 1.0 - 0.5;
+			b.x = px;
 			b.y = -0.9;
 			buildings.push(b);
 			px += screenWidth;

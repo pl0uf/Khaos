@@ -1,5 +1,6 @@
 package;
 
+import kha.Assets;
 import kha.System;
 #if js
 import js.html.CanvasElement;
@@ -23,7 +24,9 @@ class Main {
     #end
 
 		System.init({title: "Khaos", width: WIDTH, height: HEIGHT}, function () {
-			new Game();
-		});
+      Assets.loadEverything(function() {
+			  new Game();
+		  });
+    });
 	}
 }
