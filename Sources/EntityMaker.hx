@@ -8,15 +8,21 @@ typedef Point = {
 	var y:Float;
 }
 
+typedef Transform = {
+	var x:Float;
+	var y:Float;
+	var rotation:Float;
+	var sx:Float;
+	var sy:Float;
+}
+
 typedef Entity = {
 	var indiceStart:Int;
 	var indiceCount:Int;
 	var vertexStart:Int;
 	var vertexCount:Int;
-	var rotation:Float;
-	var scale:Float;
-	var x:Float;
-	var y:Float;
+	var transform:Transform;
+	var parent:Entity;
 }
 
 class EntityMaker
@@ -35,7 +41,13 @@ class EntityMaker
 
 	public static function makePeople(graphicsData:GraphicsData):Entity
 	{
-		var e:Entity = { indiceStart: graphicsData.indices.length, indiceCount: 0, vertexStart: graphicsData.vertices.length, vertexCount: 0, rotation: 0.0, scale: 1.0, x: 0.0, y: 0.0};
+		var e:Entity = { indiceStart: graphicsData.indices.length
+			, indiceCount: 0
+			, vertexStart: graphicsData.vertices.length
+			, vertexCount: 0
+			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
+			, parent: null
+		};
 
 		var vert = buildVerticesFromLinesPoints(0.025, createPeoplePoints());
 		e.vertexCount = vert.length;
@@ -50,7 +62,13 @@ class EntityMaker
 
 	public static function makeMountain(graphicsData:GraphicsData, nbMountains:Int, width:Float):Entity
 	{
-		var e:Entity = { indiceStart: graphicsData.indices.length, indiceCount: 0, vertexStart: graphicsData.vertices.length, vertexCount: 0, rotation: 0.0, scale: 1.0, x: 0.0, y: 0.0};
+		var e:Entity = { indiceStart: graphicsData.indices.length
+			, indiceCount: 0
+			, vertexStart: graphicsData.vertices.length
+			, vertexCount: 0
+			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
+			, parent: null
+		};
 
 		var mountain = [];
     for (i in 0...nbMountains) {
@@ -102,7 +120,13 @@ class EntityMaker
 
 	static function createEntity(graphicsData:GraphicsData, pts:Array<Point>, scale:Float):Entity
 	{
-		var e:Entity = { indiceStart: graphicsData.indices.length, indiceCount: 0, vertexStart: graphicsData.vertices.length, vertexCount: 0, rotation: 0.0, scale: 1.0, x: 0.0, y: 0.0};
+		var e:Entity = { indiceStart: graphicsData.indices.length
+			, indiceCount: 0
+			, vertexStart: graphicsData.vertices.length
+			, vertexCount: 0
+			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
+			, parent: null
+		};
 
 		var vert = buildVerticesFromPolyLinesPoints(scale, pts);
 		e.vertexCount = vert.length;
