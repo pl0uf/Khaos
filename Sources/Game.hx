@@ -64,6 +64,7 @@ class Game {
 	var nbPeopleSaved = 0;
 	var finished = false;
 
+	var background:Entity;
 	var mountains:Entity;
 	var copter:Entity;
 	var savePoint:Entity;
@@ -72,6 +73,7 @@ class Game {
 	var entities:Array<Entity>;
 
 	var font:Font;
+	var msg = "---";
 
 	public function new() {
 		font = Assets.fonts.Inconsolata_Regular;
@@ -131,28 +133,10 @@ class Game {
 	function update(): Void {
 		if (copter.transform.y > -0.85) {
 			if (moveLeft) {
-				mountains.transform.x += copterSpeed;
-				savePoint.transform.x += copterSpeed;
-				for (b in buildings) {
-					b.transform.x += copterSpeed;
-				}
-				for (p in people) {
-					if (p.state != InsideCopter) {
-						p.transform.x += copterSpeed;
-					}
-				}
+				background.transform.x += copterSpeed;
 			}
 			else if (moveRight) {
-				mountains.transform.x -= copterSpeed;
-				savePoint.transform.x -= copterSpeed;
-				for (b in buildings) {
-					b.transform.x -= copterSpeed;
-				}
-				for (p in people) {
-					if (p.state != InsideCopter) {
-						p.transform.x -= copterSpeed;
-					}
-				}
+				background.transform.x -= copterSpeed;
 			}
 			if (moveLeft || moveRight) {
 				copter.transform.rotation += copterRotationSpeed;
@@ -173,6 +157,7 @@ class Game {
 				copter.transform.rotation = 0;
 			}
 		}
+
 		if (moveUp && copter.transform.y < 0.0) {
 			copter.transform.y += 0.01;
 		}
@@ -180,30 +165,34 @@ class Game {
 			copter.transform.y -= 0.01;
 		}
 		copter.transform.sx = copterLookLeft ? 1.0 : -1.0;
+		msg = 'bg.x = ${Std.int(background.transform.x*1000)}, ';
 		for (p in people) {
 			if (p.state == InsideCopter) {
 				if (copter.transform.y < -0.9) {
-					var distance = Math.abs(savePoint.transform.x - p.transform.x);
+					var distance = getEntitiesDistance(savePoint, p);
 					if (distance < 0.75) {
 						p.state = GoToSavePoint;
-						p.transform.x = copter.transform.x + p.transform.x;
+						p.transform.x = -background.transform.x + p.transform.x;
 						p.transform.y = -0.95;
-						p.parent = null;
+						p.parent = background;
 					}
 				}
 			}
 			else if (p.state == GoToSavePoint) {
-				var distance = Math.abs(savePoint.transform.x - p.transform.x);
-				p.transform.x += (savePoint.transform.x < p.transform.x) ? -0.01 : 0.01;
-				if (distance < 0.01) {
+				var distance = getEntitiesDistance(savePoint, p);
+				//p.transform.x += (savePoint.transform.x < p.transform.x) ? -0.01 : 0.01;
+				var pos = getLocalPositionToWorld(p);
+				var target = getLocalPositionToWorld(savePoint);
+				p.transform.x = getWorldPositionToLocal(p, (target.x < pos.x) ? new FastVector4(pos.x - 0.01, pos.y) : new FastVector4(pos.x + 0.01, pos.y)).x;
+				if (distance < 0.05) {
 					p.state = Saved;
+					p.transform.x = savePoint.transform.x + nbPeopleSaved*0.01;
 					nbPeopleSaved++;
 					finished = (nbPeopleSaved == people.length);
 				}
 			}
 			else if (p.state != Saved) {
-				var target = copterLookLeft ? copter.transform.x - copterNbPeople*0.02 : copter.transform.x + copterNbPeople*0.02;
-				var distance = Math.abs(target - p.transform.x);
+				var distance = getEntitiesDistance(copter, p);
 				if (distance < 0.75) {
 					if (copter.transform.y < -0.9) {
 						p.state = GoToCopter;
@@ -222,11 +211,15 @@ class Game {
 					p.transform.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
 				}
 				else if (p.state == GoToCopter) {
-					if (p.transform.y > -0.95) {
+					var target = copterLookLeft ? copter.transform.x - copterNbPeople*0.02 : copter.transform.x + copterNbPeople*0.02;
+					var pos = getLocalPositionToWorld(p);
+					if (pos.y > -0.95) {
 						p.transform.y -= 0.01;
 					}
-					else if (distance > 0.01) {
-						p.transform.x += (target < p.transform.x) ? -0.01 : 0.01;
+					else if (distance > 0.05) {
+						msg += 'distance = ${Std.int(distance*1000)}, target = ${Std.int(target*1000)}, pos.x = ${Std.int(pos.x*1000)}, p.x = ${Std.int(p.transform.x*1000)}';
+						//p.transform.x += (target < pos.x) ? -0.01 : 0.01;
+						p.transform.x = getWorldPositionToLocal(p, (target < pos.x) ? new FastVector4(pos.x - 0.01, pos.y) : new FastVector4(pos.x + 0.01, pos.y)).x;
 					}
 					else {
 						p.state = InsideCopter;
@@ -262,7 +255,7 @@ class Game {
 		g2.fontSize = 24;
 		g2.color = Color.fromValue(0xFFFF0000);
 		g2.drawString('KHAOS: $nbPeopleSaved/${people.length}', 5, 0);
-		g2.drawString('Inside copter: $copterNbPeople', 5, 25);
+		g2.drawString(msg, 5, 25);
 		if (finished) {
 			g2.fontSize = 100;
 			g2.drawString('YOU WIN !!!', 600, 400);
@@ -270,20 +263,45 @@ class Game {
 		g2.end();
 	}
 
-	function computeParentMatrix(e:Entity):FastMatrix4
+	function getLocalPositionToWorld(e:Entity):FastVector4
+	{
+		var v = new FastVector4(e.transform.x, e.transform.y);
+		if (e.parent != null) {
+			v = getMatrix(e.parent).multvec(v);
+		}
+		return v;
+	}
+
+	function getWorldPositionToLocal(e:Entity, v:FastVector4):FastVector4
+	{
+		if (e.parent != null) {
+			v = getMatrix(e.parent).inverse().multvec(v);
+		}
+		return v;
+	}
+
+	function getEntitiesDistance(e1:Entity, e2:Entity):Float
+	{
+		var v1 = getLocalPositionToWorld(e1);
+		var v2 = getLocalPositionToWorld(e2);
+		var v = v1.sub(v2);
+		return v.length;
+	}
+
+	function getMatrix(e:Entity):FastMatrix4
 	{
 		var m = FastMatrix4.identity();
 		m = m.multmat(FastMatrix4.scale(e.transform.sx, e.transform.sy, 1.0));
 		m = m.multmat(FastMatrix4.translation(e.transform.x, e.transform.y, 0.0));
 		m = m.multmat(FastMatrix4.rotationZ(e.transform.rotation));
 		if (e.parent != null) {
-			m = computeParentMatrix(e.parent).multmat(m);
+			m = getMatrix(e.parent).multmat(m);
 		}
 		return m;
 	}
 
 	function updateEntityVertexBuffer(e:Entity) {
-		var model = computeParentMatrix(e);
+		var model = getMatrix(e);
 		var n = e.vertexStart;
 		var vbData = graphicsData.vertexBuffer.lock();
 		while (n < (e.vertexStart + e.vertexCount)) {
@@ -321,21 +339,29 @@ class Game {
 
 	function createLevel() {
 		var screenWidth = 2*16/9;
+		background = EntityMaker.makeEmptyEntity();
 		mountains = EntityMaker.makeMountain(graphicsData, 5, screenWidth*5);
 		mountains.transform.x = -screenWidth/2;
+		mountains.parent = background;
+
 		copter = EntityMaker.makeCopter(graphicsData);
+
 		savePoint = EntityMaker.makeBuilding(graphicsData);
 		savePoint.transform.x = -screenWidth/2;
 		savePoint.transform.y = -0.9;
+		savePoint.parent = background;
+
 		buildings = new Array<Entity>();
 		var px = screenWidth/3;
 		for (i in 0...5) {
 			var b = EntityMaker.makeBuilding(graphicsData);
 			b.transform.x = px;
 			b.transform.y = -0.9;
+			b.parent = background;
 			buildings.push(b);
 			px += screenWidth;
 		}
+
 		people = new Array<People>();
 		px = screenWidth/3;
 		for (i in 0...buildings.length) {
@@ -348,7 +374,7 @@ class Game {
 				vertexStart: e.vertexStart,
 				vertexCount: e.vertexCount,
 				transform: e.transform,
-				parent: e.parent,
+				parent: background,
 				state: Wait,
 				number: -1
 			});

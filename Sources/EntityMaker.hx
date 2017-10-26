@@ -29,6 +29,18 @@ class EntityMaker
 {
 	static var LINE_WIDTH = 0.005;
 
+	public static function makeEmptyEntity():Entity
+	{
+		var e:Entity = { indiceStart: 0
+			, indiceCount: 0
+			, vertexStart: 0
+			, vertexCount: 0
+			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
+			, parent: null
+		};
+		return e;
+	}
+
   public static function makeCopter(graphicsData:GraphicsData):Entity
   {
     return createEntity(graphicsData, createCopterPoints(), 0.1);
