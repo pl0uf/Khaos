@@ -74,6 +74,12 @@ class Game {
 
 	var font:Font;
 	var msg = "---";
+	var previousMsg = "---";
+	var cameraModel:FastMatrix4;
+	var cameraProjection:FastMatrix4;
+	var cameraView:FastMatrix4;
+	var cameraTranslate = 0.0;
+	var cameraScale = 1.0;
 
 	public function new() {
 		font = Assets.fonts.Inconsolata_Regular;
@@ -89,14 +95,10 @@ class Game {
 
 		graphicsData.mvpID = graphicsData.pipeline.getConstantLocation("MVP");
 		var ratio = 1600/900;
-		var projection = FastMatrix4.orthogonalProjection(-1.0*ratio, 1.0*ratio, -1.0, 1.0, 0.1, 100.0);
-		var view = FastMatrix4.lookAt(new FastVector3(0, 0, 1), new FastVector3(0, 0, 0), new FastVector3(0, 1, 0));
-		var model = FastMatrix4.identity();
-		graphicsData.mvp = FastMatrix4.identity();
-		graphicsData.mvp = graphicsData.mvp.multmat(projection);
-		graphicsData.mvp = graphicsData.mvp.multmat(view);
-		graphicsData.mvp = graphicsData.mvp.multmat(model);
-
+		cameraProjection = FastMatrix4.orthogonalProjection(-1.0*ratio, 1.0*ratio, -1.0, 1.0, 0.1, 100.0);
+		cameraView = FastMatrix4.lookAt(new FastVector3(0, 0, 1), new FastVector3(0, 0, 0), new FastVector3(0, 1, 0));
+		cameraModel = FastMatrix4.identity();
+		updateCameraMatrix();
 		graphicsData.vertices = new Array<Float>();
 		graphicsData.indices = new Array<Int>();
 
@@ -130,6 +132,14 @@ class Game {
 		Scheduler.addTimeTask(update, 0, 1 / 60);
 	}
 
+	function updateCameraMatrix():Void
+	{
+		graphicsData.mvp = FastMatrix4.identity();
+		graphicsData.mvp = graphicsData.mvp.multmat(cameraProjection);
+		graphicsData.mvp = graphicsData.mvp.multmat(cameraView);
+		graphicsData.mvp = graphicsData.mvp.multmat(cameraModel);
+	}
+
 	function update(): Void {
 		if (copter.transform.y > -0.85) {
 			if (moveLeft) {
@@ -159,17 +169,27 @@ class Game {
 		}
 
 		if (moveUp && copter.transform.y < 0.0) {
-			copter.transform.y += 0.01;
+			copter.transform.y += 0.02;
+			cameraScale -= 0.003;
+			cameraTranslate -= 0.003;
 		}
 		else if (moveDown && copter.transform.y > -0.95) {
-			copter.transform.y -= 0.01;
+			copter.transform.y -= 0.02;
+			cameraScale += 0.003;
+			cameraTranslate += 0.003;
 		}
+		cameraModel = FastMatrix4.identity();
+		cameraModel = cameraModel.multmat(FastMatrix4.scale(cameraScale, cameraScale, cameraScale));
+		cameraModel = cameraModel.multmat(FastMatrix4.translation(0, cameraTranslate, 0));
+		cameraModel = cameraModel.multmat(FastMatrix4.rotationZ(copterLookLeft ? -copter.transform.rotation/10 : copter.transform.rotation/10));
+		updateCameraMatrix();
 		copter.transform.sx = copterLookLeft ? 1.0 : -1.0;
+		previousMsg = msg;
 		msg = 'bg.x = ${Std.int(background.transform.x*1000)}, ';
 		for (p in people) {
 			if (p.state == InsideCopter) {
 				if (copter.transform.y < -0.9) {
-					var distance = getEntitiesDistance(savePoint, p);
+					var distance = getEntitiesDistance(savePoint, copter);
 					if (distance < 0.75) {
 						p.state = GoToSavePoint;
 						p.transform.x = -background.transform.x + p.transform.x;
@@ -179,20 +199,23 @@ class Game {
 				}
 			}
 			else if (p.state == GoToSavePoint) {
-				var distance = getEntitiesDistance(savePoint, p);
-				//p.transform.x += (savePoint.transform.x < p.transform.x) ? -0.01 : 0.01;
-				var pos = getLocalPositionToWorld(p);
-				var target = getLocalPositionToWorld(savePoint);
-				p.transform.x = getWorldPositionToLocal(p, (target.x < pos.x) ? new FastVector4(pos.x - 0.01, pos.y) : new FastVector4(pos.x + 0.01, pos.y)).x;
-				if (distance < 0.05) {
+				var savePointPos = getEntityWorldPosition(savePoint);
+				var targetPosX = savePointPos.x + nbPeopleSaved*0.015;
+				var peoplePos = getEntityWorldPosition(p);
+				var distance = Math.abs(targetPosX - peoplePos.x);
+				p.transform.x += (targetPosX < peoplePos.x) ? -0.01 : 0.01;
+				if (distance < 0.01) {
 					p.state = Saved;
-					p.transform.x = savePoint.transform.x + nbPeopleSaved*0.01;
+					p.transform.x = savePoint.transform.x + nbPeopleSaved*0.015;
 					nbPeopleSaved++;
 					finished = (nbPeopleSaved == people.length);
 				}
 			}
 			else if (p.state != Saved) {
-				var distance = getEntitiesDistance(copter, p);
+				var copterPos = getEntityWorldPosition(copter);
+				var targetPosX = copterLookLeft ? copterPos.x - copterNbPeople*0.02 : copterPos.x + copterNbPeople*0.02;
+				var peoplePos = getEntityWorldPosition(p);
+				var distance = Math.abs(targetPosX -peoplePos.x);
 				if (distance < 0.75) {
 					if (copter.transform.y < -0.9) {
 						p.state = GoToCopter;
@@ -211,21 +234,17 @@ class Game {
 					p.transform.y = -0.95 + Math.abs(Math.sin(System.time*10)*0.025);
 				}
 				else if (p.state == GoToCopter) {
-					var target = copterLookLeft ? copter.transform.x - copterNbPeople*0.02 : copter.transform.x + copterNbPeople*0.02;
-					var pos = getLocalPositionToWorld(p);
-					if (pos.y > -0.95) {
+					if (peoplePos.y > -0.95) {
 						p.transform.y -= 0.01;
 					}
-					else if (distance > 0.05) {
-						msg += 'distance = ${Std.int(distance*1000)}, target = ${Std.int(target*1000)}, pos.x = ${Std.int(pos.x*1000)}, p.x = ${Std.int(p.transform.x*1000)}';
-						//p.transform.x += (target < pos.x) ? -0.01 : 0.01;
-						p.transform.x = getWorldPositionToLocal(p, (target < pos.x) ? new FastVector4(pos.x - 0.01, pos.y) : new FastVector4(pos.x + 0.01, pos.y)).x;
+					else if (distance > 0.01) {
+						p.transform.x += (targetPosX < peoplePos.x) ? -0.01 : 0.01;
 					}
 					else {
 						p.state = InsideCopter;
 						p.number = copterNbPeople;
 						p.parent = copter;
-						p.transform.x = copterLookLeft ? target - copter.transform.x : copter.transform.x - target;
+						p.transform.x = copterLookLeft ? targetPosX - copter.transform.x : copter.transform.x - targetPosX;
 						p.transform.y = 0;
 						copterNbPeople++;
 					}
@@ -255,15 +274,16 @@ class Game {
 		g2.fontSize = 24;
 		g2.color = Color.fromValue(0xFFFF0000);
 		g2.drawString('KHAOS: $nbPeopleSaved/${people.length}', 5, 0);
-		g2.drawString(msg, 5, 25);
+		//g2.drawString(previousMsg, 5, 25);
+		//g2.drawString(msg, 5, 50);
 		if (finished) {
 			g2.fontSize = 100;
-			g2.drawString('YOU WIN !!!', 600, 400);
+			g2.drawString('YOU WIN!!!', 600, 400);
 		}
 		g2.end();
 	}
 
-	function getLocalPositionToWorld(e:Entity):FastVector4
+	function getEntityWorldPosition(e:Entity):FastVector4
 	{
 		var v = new FastVector4(e.transform.x, e.transform.y);
 		if (e.parent != null) {
@@ -272,18 +292,10 @@ class Game {
 		return v;
 	}
 
-	function getWorldPositionToLocal(e:Entity, v:FastVector4):FastVector4
-	{
-		if (e.parent != null) {
-			v = getMatrix(e.parent).inverse().multvec(v);
-		}
-		return v;
-	}
-
 	function getEntitiesDistance(e1:Entity, e2:Entity):Float
 	{
-		var v1 = getLocalPositionToWorld(e1);
-		var v2 = getLocalPositionToWorld(e2);
+		var v1 = getEntityWorldPosition(e1);
+		var v2 = getEntityWorldPosition(e2);
 		var v = v1.sub(v2);
 		return v.length;
 	}
