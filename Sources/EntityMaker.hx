@@ -23,11 +23,31 @@ typedef Entity = {
 	var vertexCount:Int;
 	var transform:Transform;
 	var parent:Entity;
+	var model:Model;
+	var currentAnimation:String;
+}
+
+typedef Shape = Array<Array<Point>>;
+typedef Frame = Array<Float>;
+typedef Animation = Array<Frame>;
+
+typedef Model = {
+	var animations:Map<String, Animation>;
+	var scale:Float;
+}
+
+typedef AnimationDeclaration = {
+	var name:String;
+	var frames:Animation;
 }
 
 class EntityMaker
 {
 	static var LINE_WIDTH = 0.005;
+	static var CopterModel = createModel([ { name: "normal", frames: [getFrameFromShape(createCopterShape(), 0.1)] } ]);
+	static var BuildingModel = createModel([ { name: "normal", frames: [getFrameFromShape(createBuildingShape(), 0.06)] } ]);
+	static var PeopleModel = createModel([ { name: "normal", frames: [getFrameFromShape(createPeopleNormalShape(), 0.025)] }
+																			 , { name: "moving", frames: createPeopleMovingAnimation() } ]);
 
 	public static function makeEmptyEntity():Entity
 	{
@@ -37,50 +57,30 @@ class EntityMaker
 			, vertexCount: 0
 			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
 			, parent: null
+			, model: null
+			, currentAnimation: "normal"
 		};
 		return e;
 	}
 
   public static function makeCopter(graphicsData:GraphicsData):Entity
   {
-    return createEntity(graphicsData, createCopterPoints(), 0.1);
+		return createEntity(graphicsData, CopterModel);
   }
 
   public static function makeBuilding(graphicsData:GraphicsData):Entity
   {
-    return createEntity(graphicsData, createBuildingPoints(), 0.06);
+		return createEntity(graphicsData, BuildingModel);
   }
 
 	public static function makePeople(graphicsData:GraphicsData):Entity
 	{
-		var e:Entity = { indiceStart: graphicsData.indices.length
-			, indiceCount: 0
-			, vertexStart: graphicsData.vertices.length
-			, vertexCount: 0
-			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
-			, parent: null
-		};
-
-		var vert = buildVerticesFromLinesPoints(0.025, createPeoplePoints());
-		e.vertexCount = vert.length;
-
-		var ind = buildIndicesFromLines(vert, Std.int(graphicsData.vertices.length/2));
-		e.indiceCount = ind.length;
-
-		graphicsData.vertices = graphicsData.vertices.concat(vert);
-		graphicsData.indices = graphicsData.indices.concat(ind);
-		return e;		
+		return createEntity(graphicsData, PeopleModel);
 	}
 
 	public static function makeMountain(graphicsData:GraphicsData, nbMountains:Int, width:Float):Entity
 	{
-		var e:Entity = { indiceStart: graphicsData.indices.length
-			, indiceCount: 0
-			, vertexStart: graphicsData.vertices.length
-			, vertexCount: 0
-			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
-			, parent: null
-		};
+		var e:Entity = makeEmptyEntity();
 
 		var mountain = [];
     for (i in 0...nbMountains) {
@@ -99,9 +99,9 @@ class EntityMaker
 		return e;
 	}
 
-	static function createCopterPoints():Array<Point>
+	static function createCopterShape():Shape
 	{
-		var pts = [
+		return [ [
 				{ x: -1.0, y: 0.0 }
 			, { x: -0.8, y: 0.25 }
 			, { x: -0.1, y: 0.25 }
@@ -113,24 +113,22 @@ class EntityMaker
 			, { x: -0.1, y: -0.2 }
 			, { x: -0.8, y: -0.2 }
 			, { x: -1.0, y: 0.0 }
-		];
-		return pts;
+		] ];
 	}
 
-	static function createBuildingPoints():Array<Point>
+	static function createBuildingShape():Shape
 	{
-		var pts = [
+		return [ [
 				{ x: -1.0, y: -1.0 }
 			, { x: -0.75, y: 0.60 }
 			, { x: 0.0, y: 1.0 }
 			, { x: 0.75, y: 0.60 }
 			, { x: 1.0, y: -1.0 }
 			, { x: -1.0, y: -1.0 }
-		];
-		return pts;
+		] ];
 	}
 
-	static function createEntity(graphicsData:GraphicsData, pts:Array<Point>, scale:Float):Entity
+	static function createEntity(graphicsData:GraphicsData, model:Model):Entity
 	{
 		var e:Entity = { indiceStart: graphicsData.indices.length
 			, indiceCount: 0
@@ -138,9 +136,11 @@ class EntityMaker
 			, vertexCount: 0
 			, transform: { x: 0, y: 0, rotation: 0, sx: 1.0, sy: 1.0 }
 			, parent: null
+			, model: model
+			, currentAnimation: "normal"
 		};
 
-		var vert = buildVerticesFromPolyLinesPoints(scale, pts);
+		var vert = model.animations["normal"][0];
 		e.vertexCount = vert.length;
 
 		var ind = buildIndicesFromLines(vert, Std.int(graphicsData.vertices.length/2));
@@ -152,31 +152,99 @@ class EntityMaker
 		return e;		
 	}
 
-	static function createPeoplePoints():Array<Point>
+	static function createPeopleNormalShape():Shape
 	{
 		return [
-			// Head
-			{ x: 0.0, y: 1.0 }, { x: 0.2, y: 0.8 },
-			{ x: 0.2, y: 0.8 }, { x: 0.0, y: 0.6 },
-			{ x: 0.0, y: 0.6 }, { x: -0.2, y: 0.8 },
-			{ x: -0.2, y: 0.8 }, { x: 0.0, y: 1.0 },
-			// Torso
-			{ x: 0.0, y: 0.6 }, { x: 0.11, y: 0.0 },
-			// Left arm
-			{ x: 0.0, y: 0.4 }, { x: -0.3, y: 0.5 },
-			{ x: -0.3, y: 0.5 }, { x: -0.5, y: 0.8 },
-			// Right arm
-			{ x: 0.0, y: 0.4 }, { x: 0.3, y: 0.5 },
-			{ x: 0.3, y: 0.5 }, { x: 0.5, y: 0.8 },
-			// Left leg
-			{ x: 0.11, y: 0.0 }, { x: -0.2, y: -0.4 },
-			{ x: -0.2, y: -0.4 }, { x: -0.3, y: -1.0 },
-			{ x: -0.3, y: -1.0 }, { x: -0.35, y: -1.0 },
-			// Right leg
-			{ x: 0.11, y: 0.0 }, { x: 0.2, y: -0.4 },
-			{ x: 0.2, y: -0.4 }, { x: 0.3, y: -1.0 },
-			{ x: 0.3, y: -1.0 }, { x: 0.35, y: -1.0 }
+			[ // Head
+				{ x: 0.0, y: 1.0 },
+				{ x: 0.2, y: 0.8 },
+				{ x: 0.0, y: 0.6 },
+				{ x: -0.2, y: 0.8 },
+				{ x: 0.0, y: 1.0 }
+			],
+			[	// Torso
+				{ x: 0.0, y: 0.6 },
+				{ x: 0.11, y: 0.0 }
+			],
+			[ // Left arm
+				{ x: 0.0, y: 0.4 },
+				{ x: -0.3, y: 0.5 },
+				{ x: -0.5, y: 0.8 }
+			],
+			[	// Right arm
+				{ x: 0.0, y: 0.4 },
+				{ x: 0.3, y: 0.5 },
+				{ x: 0.5, y: 0.8 }
+			],
+			[	// Left leg
+				{ x: 0.11, y: 0.0 },
+				{ x: -0.2, y: -0.4 },
+				{ x: -0.3, y: -1.0 },
+				{ x: -0.35, y: -1.0 }
+			],
+			[ // Right leg
+				{ x: 0.11, y: 0.0 },
+				{ x: 0.2, y: -0.4 },
+				{ x: 0.3, y: -1.0 },
+				{ x: 0.35, y: -1.0 }
+			]
 		];
+	}
+
+	static function createPeopleUpShape():Shape
+	{
+		return [
+			[ // Head
+				{ x: 0.0, y: 1.0 },
+				{ x: 0.2, y: 0.8 },
+				{ x: 0.0, y: 0.6 },
+				{ x: -0.2, y: 0.8 },
+				{ x: 0.0, y: 1.0 }
+			],
+			[	// Torso
+				{ x: 0.0, y: 0.6 },
+				{ x: 0.11, y: 0.0 }
+			],
+			[ // Left arm
+				{ x: 0.0, y: 0.4 },
+				{ x: -0.3, y: 0.3 },
+				{ x: -0.5, y: 0.0 }
+			],
+			[	// Right arm
+				{ x: 0.0, y: 0.4 },
+				{ x: 0.3, y: 0.3 },
+				{ x: 0.5, y: 0.0 }
+			],
+			[	// Left leg
+				{ x: 0.11, y: 0.0 },
+				{ x: -0.2, y: -0.4 },
+				{ x: -0.3, y: -1.0 },
+				{ x: -0.35, y: -1.0 }
+			],
+			[ // Right leg
+				{ x: 0.11, y: 0.0 },
+				{ x: 0.2, y: -0.4 },
+				{ x: 0.3, y: -1.0 },
+				{ x: 0.35, y: -1.0 }
+			]
+		];
+	}
+
+	static function createPeopleMovingAnimation():Animation
+	{
+		return [
+			getFrameFromShape(createPeopleNormalShape(), 0.025),
+			getFrameFromShape(createPeopleUpShape(), 0.025)
+		];
+	}
+
+	static function getFrameFromShape(shape:Shape, scale:Float):Frame
+	{
+		var frame = new Frame();
+		for (polyline in shape) {
+			frame = frame.concat(buildVerticesFromPolyLinesPoints(scale, polyline));
+		}
+		return frame;
 	}
 
 	static function createMountainHeights(iteration:Int):Array<Float>
@@ -292,4 +360,18 @@ class EntityMaker
 		return vert;
 	}
 
+	static function createModel(animations:Array<AnimationDeclaration>):Model
+	{
+		var model = {
+			animations: new Map<String, Animation>(),
+			scale: 1.0
+		}
+		for (anim in animations) {
+			model.animations[anim.name] = new Animation();
+			for (points in anim.frames) {
+				model.animations[anim.name].push(points);
+			}
+		}
+		return model;
+	}
 }

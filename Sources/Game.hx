@@ -78,8 +78,8 @@ class Game {
 	var cameraModel:FastMatrix4;
 	var cameraProjection:FastMatrix4;
 	var cameraView:FastMatrix4;
-	var cameraTranslate = 0.0;
-	var cameraScale = 1.0;
+	var cameraScale = 0.5;
+	var cameraScaleSpeed = 0.025;
 
 	public function new() {
 		font = Assets.fonts.Inconsolata_Regular;
@@ -170,23 +170,23 @@ class Game {
 
 		if (moveUp && copter.transform.y < 0.0) {
 			copter.transform.y += 0.02;
-			cameraScale -= 0.003;
-			cameraTranslate -= 0.003;
+			cameraScale -= cameraScaleSpeed;
 		}
 		else if (moveDown && copter.transform.y > -0.95) {
 			copter.transform.y -= 0.02;
-			cameraScale += 0.003;
-			cameraTranslate += 0.003;
+			cameraScale += cameraScaleSpeed;
 		}
 		cameraModel = FastMatrix4.identity();
+		cameraModel = cameraModel.multmat(FastMatrix4.translation(0, cameraScale-1, 0)); // 1 == demi height of screen (see orthogonal projection)
 		cameraModel = cameraModel.multmat(FastMatrix4.scale(cameraScale, cameraScale, cameraScale));
-		cameraModel = cameraModel.multmat(FastMatrix4.translation(0, cameraTranslate, 0));
-		cameraModel = cameraModel.multmat(FastMatrix4.rotationZ(copterLookLeft ? -copter.transform.rotation/10 : copter.transform.rotation/10));
+		cameraModel = cameraModel.multmat(FastMatrix4.rotationZ(copterLookLeft ? -copter.transform.rotation/20 : copter.transform.rotation/20));
+
 		updateCameraMatrix();
 		copter.transform.sx = copterLookLeft ? 1.0 : -1.0;
 		previousMsg = msg;
 		msg = 'bg.x = ${Std.int(background.transform.x*1000)}, ';
 		for (p in people) {
+			p.currentAnimation = "normal";
 			if (p.state == InsideCopter) {
 				if (copter.transform.y < -0.9) {
 					var distance = getEntitiesDistance(savePoint, copter);
@@ -226,6 +226,7 @@ class Game {
 				}
 				else {
 					p.state = Wait;
+					p.currentAnimation = "moving";
 				}
 				if (p.state == Wait) {
 					p.transform.y = -0.95;
@@ -314,13 +315,25 @@ class Game {
 
 	function updateEntityVertexBuffer(e:Entity) {
 		var model = getMatrix(e);
-		var n = e.vertexStart;
 		var vbData = graphicsData.vertexBuffer.lock();
-		while (n < (e.vertexStart + e.vertexCount)) {
-			var v = model.multvec(new FastVector4(graphicsData.vertices[n], graphicsData.vertices[n + 1]));
-			vbData.set(n, v.x);
-			vbData.set(n+1, v.y);
-			n += 2;
+		var n = 0;
+		if (e.model != null) {
+			var indexAnimation = Std.int(System.time*10) % e.model.animations[e.currentAnimation].length;
+			var frame = e.model.animations[e.currentAnimation][indexAnimation];
+			while (n < e.vertexCount) {
+				var v = model.multvec(new FastVector4(frame[n]*e.model.scale, frame[n + 1]*e.model.scale));
+				vbData.set(e.vertexStart + n, v.x);
+				vbData.set(e.vertexStart + n + 1, v.y);
+				n += 2;
+			}
+		}
+		else {
+			while (n < e.vertexCount) {
+				var v = model.multvec(new FastVector4(graphicsData.vertices[n], graphicsData.vertices[n + 1]));
+				vbData.set(e.vertexStart + n, v.x);
+				vbData.set(e.vertexStart + n + 1, v.y);
+				n += 2;
+			}
 		}
 		graphicsData.vertexBuffer.unlock();
 	}
@@ -387,6 +400,8 @@ class Game {
 				vertexCount: e.vertexCount,
 				transform: e.transform,
 				parent: background,
+				model: e.model,
+				currentAnimation: e.currentAnimation,
 				state: Wait,
 				number: -1
 			});
